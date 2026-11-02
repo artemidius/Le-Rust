@@ -1,0 +1,6 @@
+{
+  "source": "https://docs.mistral.ai/openapi.yaml",
+  "retrieved": "2026-11-13",
+  "sha256": "7b344504336785172c86cd826ce4b1cbfd12be228a8432cf046b2b8fdafacf72",
+  "policy": "A changed digest requires human review; it never regenerates or publishes the SDK automatically."
+}

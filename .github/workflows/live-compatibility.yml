@@ -1,0 +1,38 @@
+name: Live Mistral compatibility
+
+on:
+  workflow_dispatch:
+    inputs:
+      chat_model:
+        description: Account-available model for chat, tools, and structured output
+        required: true
+        type: string
+      codestral_model:
+        description: Account-available model with native FIM support
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    environment: live-compatibility
+    env:
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      MISTRAL_MODEL: ${{ inputs.chat_model }}
+      CODESTRAL_MODEL: ${{ inputs.codestral_model }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Require configured secret
+        shell: bash
+        run: test -n "$MISTRAL_API_KEY"
+      - run: cargo run --example models
+      - run: cargo run --example chat
+      - run: cargo run --example stream
+      - run: cargo run --example tools
+      - run: cargo run --example structured_output
+      - run: cargo run --example fim
