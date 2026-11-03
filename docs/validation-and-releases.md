@@ -34,19 +34,23 @@ Live checks verify wire compatibility, not the wording or deterministic quality 
 
 ## API drift
 
-`spec/source.json` pins the official OpenAPI URL and reviewed SHA-256 digest. `scripts/check-openapi.py` downloads the current source and compares it with the pin. The weekly/manual workflow fails on a changed digest so maintainers can review supported operations and update types, fixtures, and the pin together.
+`spec/source.json` pins the official OpenAPI URL and reviewed SHA-256 digest. `spec/covered-openapi.json` stores a canonical snapshot of supported operations plus their transitive schemas. `scripts/check-openapi.py` classifies the current source as an exact match, an unrelated upstream change, or a covered-surface change. Unrelated endpoint additions produce a report without failing; a covered change identifies affected operations and references and fails for review.
 
-Drift detection never regenerates code, commits changes, or publishes a crate automatically.
+`python3 -m unittest scripts/test_check_openapi.py` proves both classifications using synthetic schemas. The weekly/manual workflow always uploads the JSON report. Drift detection never regenerates code, commits changes, or publishes a crate automatically.
+
+## Extracted-package consumer
+
+`scripts/test-package-consumer.sh` runs `cargo package`, extracts the resulting archive into a temporary directory, and builds a separate consumer whose dependency points only at that extracted package. Its local mock exercises all six methods plus chat streaming, fragmented tool-call collection, explicit tool-result continuation, JSON Schema parsing, and FIM streaming. This catches missing package files, private-module dependencies, and workspace-only path assumptions.
 
 ## Release checklist
 
-- [ ] Formatting, Clippy, tests, docs, MSRV, platform matrix, and package jobs pass on the release commit.
-- [ ] The package archive contains the intended sources, docs, examples, and dual licenses only.
-- [ ] `cargo publish --dry-run` succeeds for the exact version.
-- [ ] The supported-operation inventory and OpenAPI digest are current.
-- [ ] A dated live compatibility run is recorded, or its absence is explicit in the release notes.
-- [ ] `CHANGELOG.md` contains the release date and user-visible compatibility notes.
-- [ ] The release commit and tag are reviewed before registry publication.
+- [x] Formatting, Clippy, tests, docs, MSRV, platform matrix, and package jobs pass on the release commit.
+- [x] The package archive contains the intended sources, docs, examples, and dual licenses only.
+- [x] `cargo publish --dry-run` succeeds for the exact version.
+- [x] The supported-operation inventory and OpenAPI digest are current.
+- [x] A dated live compatibility run is recorded, or its absence is explicit in the release notes.
+- [x] `CHANGELOG.md` contains the release date and user-visible compatibility notes.
+- [x] The release commit and tag are reviewed before registry publication.
 - [ ] After publication, installation and docs.rs rendering are checked from the released artifact.
 
 Released crate versions are immutable. Le Rust follows semantic versioning; before 1.0, public breaking changes increment the minor version and include migration notes. The MSRV remains stable within a minor line unless a documented security or dependency requirement forces a change.

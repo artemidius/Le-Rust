@@ -55,6 +55,23 @@ pub struct RequestOptions {
     pub response_body_bytes: Option<usize>,
 }
 
+impl RequestOptions {
+    pub fn header_timeout(mut self, timeout: Duration) -> Self {
+        self.header_timeout = Some(timeout);
+        self
+    }
+
+    pub fn operation_timeout(mut self, timeout: Duration) -> Self {
+        self.operation_timeout = Some(timeout);
+        self
+    }
+
+    pub fn response_body_bytes(mut self, limit: usize) -> Self {
+        self.response_body_bytes = Some(limit);
+        self
+    }
+}
+
 #[derive(Clone)]
 /// Cloneable asynchronous client sharing one connection pool.
 pub struct Client {
@@ -298,6 +315,7 @@ impl Client {
         query: &[(&str, String)],
         options: RequestOptions,
     ) -> Result<ApiResponse<T>> {
+        self.validate_request_options(options)?;
         let request = self
             .request(Method::GET, url, options)
             .query(query)
@@ -312,6 +330,7 @@ impl Client {
         body: &B,
         options: RequestOptions,
     ) -> Result<ApiResponse<T>> {
+        self.validate_request_options(options)?;
         let request = self
             .request(Method::POST, self.url(path)?, options)
             .json(body)
@@ -326,6 +345,7 @@ impl Client {
         body: &B,
         options: RequestOptions,
     ) -> Result<CompletionStream> {
+        self.validate_request_options(options)?;
         let request = self
             .request(Method::POST, self.url(path)?, options)
             .header(reqwest::header::ACCEPT, "text/event-stream")
@@ -353,6 +373,47 @@ impl Client {
             meta,
             self.inner.limits,
         ))
+    }
+
+    fn validate_request_options(&self, options: RequestOptions) -> Result<()> {
+        for (name, requested, configured) in [
+            (
+                "header timeout",
+                options.header_timeout,
+                self.inner.header_timeout,
+            ),
+            (
+                "operation timeout",
+                options.operation_timeout,
+                self.inner.operation_timeout,
+            ),
+        ] {
+            if let Some(requested) = requested {
+                if requested.is_zero() {
+                    return Err(Error::InvalidRequest(format!(
+                        "{name} override must be positive"
+                    )));
+                }
+                if requested > configured {
+                    return Err(Error::InvalidRequest(format!(
+                        "{name} override may only narrow the client default"
+                    )));
+                }
+            }
+        }
+        if let Some(requested) = options.response_body_bytes {
+            if requested == 0 {
+                return Err(Error::InvalidRequest(
+                    "response body limit override must be positive".into(),
+                ));
+            }
+            if requested > self.inner.limits.response_body_bytes {
+                return Err(Error::InvalidRequest(
+                    "response body limit override may only narrow the client default".into(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn request(

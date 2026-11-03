@@ -2,6 +2,28 @@
 
 Le Rust is a small asynchronous SDK for the native Mistral API. Its first release deliberately covers model discovery, chat completions, function-tool payloads, structured and predicted output, and FIM completions. It is not a generated client for the entire platform.
 
+## Implementation status
+
+The original 0.1 backlog is complete in the release candidate. Evidence is kept with the behavior rather than as an unchecked promise.
+
+| Phase | Result | Primary evidence |
+| --- | --- | --- |
+| P00 — contract and provenance | Complete | [`spec/coverage.toml`](../spec/coverage.toml), [`spec/source.json`](../spec/source.json), [design comparison](design-comparison.md) |
+| P01 — crate foundation | Complete | dual licenses, CI, Rust 1.88 job, examples, contributor and security policies |
+| P02 — transport and errors | Complete | client/transport unit and mock-server tests; disabled redirects/retries; bounded redacted errors |
+| P03 — models | Complete | list/retrieve contract tests, encoded IDs, forward-compatible cards, envelope/bare-list decoding |
+| P04 — complete chat | Complete | typed request builders, replayable responses, alternate native choice shapes, forward-compatible fields |
+| P05 — SSE | Complete | exhaustive split tests, one-byte/Unicode/line-ending fixtures, limits, explicit terminal state |
+| P06 — tools and output | Complete | indexed bounded collector, tool continuation example, response formats, typed JSON parser, prediction |
+| P07 — FIM | Complete | native complete/stream methods, fallible text accessor, examples and disconnect/limit tests |
+| P08 — diagnostics | Complete | timing, non-SSE, malformed-body, concurrency, redaction, retry metadata, optional tracing tests |
+| P09 — documentation | Complete | README, examples, API/runtime contract, references, validation and release policy |
+| P10 — API drift | Complete | covered-surface snapshot, classified report, synthetic change tests, weekly/manual artifact workflow |
+| P11 — independent consumer | Complete | extracted `.crate` consumer exercises discovery, streaming tools, continuation, JSON, and FIM |
+| P12 — release candidate | Complete | [`release-evidence/0.1.0.md`](release-evidence/0.1.0.md), package/dry-run gates, reviewed tag and release |
+
+Registry publication is a separate maintainer action. Authenticated provider compatibility is also separately recorded because deterministic mocks cannot substitute for an account-backed call.
+
 ## Design goals
 
 - Preserve Mistral-native request and response semantics instead of hiding them behind a provider-neutral interface.
@@ -49,7 +71,7 @@ A choice finish reason is model output, not the transport terminator. The decode
 
 ## Compatibility policy
 
-Requests expose typed fields for the supported core and a collision-checked extension map for newer chat fields. Responses preserve unknown data instead of rejecting it. The official OpenAPI source is pinned by digest in `spec/source.json`; the scheduled drift check reports a changed digest but never rewrites public Rust types or publishes a release.
+Requests expose typed fields for the supported core and a collision-checked extension map for newer chat fields. Responses preserve unknown data instead of rejecting it. The official OpenAPI source is pinned by digest in `spec/source.json`. The drift check compares a canonical snapshot of only supported operations and transitive schemas: unrelated upstream additions are reported without failing, while changes affecting covered surfaces fail with their operations and references identified. It never rewrites public Rust types or publishes a release.
 
 The minimum supported compiler is Rust 1.88. The default TLS backend is rustls. `tracing` is optional and emits metadata only; the crate never installs a subscriber.
 

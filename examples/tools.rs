@@ -43,8 +43,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .choices
         .first()
         .ok_or_else(|| io::Error::other("no choice returned"))?;
-    let call = assistant
-        .message
+    let assistant_message = assistant
+        .message()
+        .ok_or_else(|| io::Error::other("choice did not contain an assistant message"))?;
+    let call = assistant_message
         .tool_calls
         .first()
         .ok_or_else(|| io::Error::other("no tool call returned"))?;
@@ -57,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or_else(|| io::Error::other("tool call had no ID"))?;
     let messages = vec![
         Message::user("What time is it in Vienna? Use the tool."),
-        assistant.message.to_message(),
+        assistant_message.to_message(),
         Message::tool(
             call_id,
             json!({"time":"12:00","timezone":"Europe/Vienna"}).to_string(),
@@ -71,7 +73,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .data
         .choices
         .first()
-        .and_then(|choice| choice.message.text())
+        .and_then(|choice| choice.message())
+        .and_then(|message| message.text())
     {
         println!("{text}");
     }

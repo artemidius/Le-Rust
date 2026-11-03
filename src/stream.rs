@@ -392,13 +392,14 @@ impl ChoiceAccumulator {
         }
         Ok(ChatChoice {
             index,
-            message: AssistantResponseMessage {
+            message: Some(AssistantResponseMessage {
                 role: self.role.or_else(|| Some("assistant".into())),
                 content: self.content,
                 tool_calls,
                 prefix: None,
                 extra: BTreeMap::new(),
-            },
+            }),
+            messages: Vec::new(),
             finish_reason: self.finish_reason,
             extra: BTreeMap::new(),
         })

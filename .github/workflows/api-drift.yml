@@ -16,4 +16,16 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - run: python3 scripts/check-openapi.py
+          cache: pip
+          cache-dependency-path: scripts/requirements-openapi.txt
+      - run: python3 -m pip install -r scripts/requirements-openapi.txt
+      - run: python3 -m unittest scripts/test_check_openapi.py
+      - run: python3 scripts/check-openapi.py --report openapi-drift-report.json
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mistral-openapi-drift-report
+          path: openapi-drift-report.json
+          if-no-files-found: error
+          retention-days: 30

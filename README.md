@@ -26,11 +26,11 @@ Model identifiers are caller-supplied strings. Le Rust never selects a model, ex
 
 ```toml
 [dependencies]
-le-rust = { git = "https://github.com/artemidius/Le-Rust" }
+le-rust = { git = "https://github.com/artemidius/Le-Rust", tag = "v0.1.0" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-The crates.io package is prepared but not yet published. Pin a Git revision for reproducible builds until the first registry release.
+The crates.io package is prepared but not yet published. Use the release tag (or pin its commit) for reproducible builds until the first registry release.
 
 Set `MISTRAL_API_KEY` in the process environment, then create a client explicitly:
 
@@ -50,7 +50,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    if let Some(text) = response.data.choices.first().and_then(|choice| choice.message.text()) {
+    if let Some(text) = response
+        .data
+        .choices
+        .first()
+        .and_then(|choice| choice.message())
+        .and_then(|message| message.text())
+    {
         println!("{text}");
     }
     Ok(())
@@ -110,7 +116,7 @@ Runnable examples cover [models](examples/models.rs), [chat](examples/chat.rs), 
 - Client and error `Debug`/`Display`, plus optional tracing, omit credentials and request/response content.
 - Provider error bodies are available only through `ApiError::diagnostic_body()` and may contain submitted content.
 
-See the [API and runtime contract](docs/api-and-runtime-contract.md) and [validation policy](docs/validation-and-releases.md) for details.
+See the [API and runtime contract](docs/api-and-runtime-contract.md), [design context](docs/design-comparison.md), and [validation policy](docs/validation-and-releases.md) for details.
 
 ## Development
 

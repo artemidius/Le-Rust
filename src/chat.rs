@@ -70,7 +70,7 @@ pub struct ChatRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     repetition_penalty: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    top_k: Option<u64>,
+    top_k: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     n: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -200,7 +200,7 @@ impl ChatRequest {
         self
     }
 
-    pub fn top_k(mut self, top_k: u64) -> Self {
+    pub fn top_k(mut self, top_k: i64) -> Self {
         self.top_k = Some(top_k);
         self
     }
@@ -290,21 +290,51 @@ impl ChatRequest {
                 )));
             }
         }
-        for (name, value) in [
-            ("temperature", self.temperature),
-            ("top_p", self.top_p),
-            ("presence_penalty", self.presence_penalty),
-            ("frequency_penalty", self.frequency_penalty),
-            ("repetition_penalty", self.repetition_penalty),
-        ] {
-            if value.is_some_and(|value| !value.is_finite()) {
-                return Err(crate::Error::InvalidRequest(format!(
-                    "{name} must be finite"
-                )));
-            }
+        validate_inclusive("temperature", self.temperature, 0.0, 1.5)?;
+        validate_exclusive_inclusive("top_p", self.top_p, 0.0, 1.0)?;
+        validate_inclusive("presence_penalty", self.presence_penalty, -2.0, 2.0)?;
+        validate_inclusive("frequency_penalty", self.frequency_penalty, -2.0, 2.0)?;
+        validate_exclusive_inclusive("repetition_penalty", self.repetition_penalty, 0.0, 2.0)?;
+        if self.random_seed.is_some_and(|value| value < 0) {
+            return Err(crate::Error::InvalidRequest(
+                "random_seed must be zero or greater".into(),
+            ));
+        }
+        if self.top_k.is_some_and(|value| value < -1) {
+            return Err(crate::Error::InvalidRequest(
+                "top_k must be -1 or greater".into(),
+            ));
+        }
+        if self.n == Some(0) {
+            return Err(crate::Error::InvalidRequest(
+                "number of choices must be at least one".into(),
+            ));
         }
         Ok(())
     }
+}
+
+fn validate_inclusive(name: &str, value: Option<f64>, minimum: f64, maximum: f64) -> Result<()> {
+    if value.is_some_and(|value| !value.is_finite() || value < minimum || value > maximum) {
+        return Err(crate::Error::InvalidRequest(format!(
+            "{name} must be between {minimum} and {maximum}, inclusive"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_exclusive_inclusive(
+    name: &str,
+    value: Option<f64>,
+    minimum: f64,
+    maximum: f64,
+) -> Result<()> {
+    if value.is_some_and(|value| !value.is_finite() || value <= minimum || value > maximum) {
+        return Err(crate::Error::InvalidRequest(format!(
+            "{name} must be greater than {minimum} and no greater than {maximum}"
+        )));
+    }
+    Ok(())
 }
 
 const RESERVED_CHAT_FIELDS: &[&str] = &[
@@ -613,15 +643,44 @@ pub struct ChatCompletionResponse {
     pub extra: BTreeMap<String, Value>,
 }
 
+impl ChatCompletionResponse {
+    /// Return text from the first standard completion choice.
+    ///
+    /// This convenience accessor is intentionally fallible: an empty choice
+    /// list, an alternate multi-message response, and structured block content
+    /// are distinct provider responses and are not converted into empty text.
+    pub fn first_text(&self) -> std::result::Result<&str, CompletionTextError> {
+        let choice = self
+            .choices
+            .first()
+            .ok_or(CompletionTextError::MissingChoice)?;
+        let message = choice
+            .message()
+            .ok_or(CompletionTextError::MissingMessage)?;
+        message.text().ok_or(CompletionTextError::NonTextContent)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[non_exhaustive]
 pub struct ChatChoice {
     pub index: usize,
-    pub message: AssistantResponseMessage,
+    #[serde(default)]
+    pub message: Option<AssistantResponseMessage>,
+    /// Alternate native multi-completion payload used by some tool families.
+    #[serde(default)]
+    pub messages: Vec<DeltaMessage>,
     #[serde(default)]
     pub finish_reason: Option<FinishReason>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatChoice {
+    /// Return the ordinary assistant message when this is a standard completion.
+    pub fn message(&self) -> Option<&AssistantResponseMessage> {
+        self.message.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -647,6 +706,17 @@ impl AssistantResponseMessage {
         }
     }
 
+    /// Deserialize a text response into an application type.
+    ///
+    /// This verifies JSON syntax and the requested Rust shape. It does not
+    /// replace application-level validation.
+    pub fn parse_json<T: serde::de::DeserializeOwned>(
+        &self,
+    ) -> std::result::Result<T, OutputParseError> {
+        let text = self.text().ok_or(OutputParseError::MissingText)?;
+        serde_json::from_str(text).map_err(OutputParseError::Json)
+    }
+
     /// Convert a response to a replayable assistant message without flattening content.
     pub fn to_message(&self) -> Message {
         Message::Assistant {
@@ -656,6 +726,26 @@ impl AssistantResponseMessage {
             extra: self.extra.clone(),
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum OutputParseError {
+    #[error("assistant response did not contain text")]
+    MissingText,
+    #[error("assistant response text was not valid for the requested JSON type")]
+    Json(#[source] serde_json::Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum CompletionTextError {
+    #[error("completion response did not contain a choice")]
+    MissingChoice,
+    #[error("first completion choice did not contain a standard assistant message")]
+    MissingMessage,
+    #[error("first completion message did not contain plain text")]
+    NonTextContent,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -888,5 +978,87 @@ mod tests {
         assert_eq!(value["prompt_mode"], "reasoning");
         assert_eq!(value["service_tier"], "standard_only");
         assert_eq!(value["top_prompt_logprobs"], 4);
+    }
+
+    #[test]
+    fn documented_numeric_ranges_are_validated() {
+        let base = || ChatRequest::new("model", vec![Message::user("hello")]);
+        assert!(base().temperature(1.5).validate().is_ok());
+        assert!(base().temperature(1.500_001).validate().is_err());
+        assert!(base().top_p(0.0).validate().is_err());
+        assert!(base().presence_penalty(-2.0).validate().is_ok());
+        assert!(base().frequency_penalty(2.1).validate().is_err());
+        assert!(base().repetition_penalty(0.0).validate().is_err());
+        assert!(base().random_seed(-1).validate().is_err());
+        assert!(base().top_k(-1).validate().is_ok());
+        assert!(base().top_k(-2).validate().is_err());
+        assert!(base().choices(0).validate().is_err());
+    }
+
+    #[test]
+    fn alternate_multi_completion_shape_is_preserved() {
+        let choice: ChatChoice = serde_json::from_value(serde_json::json!({
+            "index": 0,
+            "messages": [{"role":"assistant", "content":"server tool output"}],
+            "finish_reason": "stop"
+        }))
+        .unwrap();
+        assert!(choice.message.is_none());
+        assert_eq!(choice.messages.len(), 1);
+        assert_eq!(
+            choice.messages[0].content,
+            Some(Content::Text("server tool output".into()))
+        );
+    }
+
+    #[test]
+    fn structured_output_parser_is_explicit_and_typed() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Answer {
+            value: u8,
+        }
+
+        let message: AssistantResponseMessage = serde_json::from_value(serde_json::json!({
+            "role": "assistant",
+            "content": "{\"value\":7}"
+        }))
+        .unwrap();
+        assert_eq!(message.parse_json::<Answer>().unwrap(), Answer { value: 7 });
+
+        let blocks: AssistantResponseMessage = serde_json::from_value(serde_json::json!({
+            "role": "assistant",
+            "content": [{"type":"text", "text":"{}"}]
+        }))
+        .unwrap();
+        assert!(matches!(
+            blocks.parse_json::<Answer>(),
+            Err(OutputParseError::MissingText)
+        ));
+    }
+
+    #[test]
+    fn completion_text_accessor_is_fallible() {
+        let response: ChatCompletionResponse = serde_json::from_value(serde_json::json!({
+            "id": "cmpl_1",
+            "model": "model",
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": "middle"},
+                "finish_reason": "stop"
+            }]
+        }))
+        .unwrap();
+        assert_eq!(response.first_text().unwrap(), "middle");
+
+        let empty: ChatCompletionResponse = serde_json::from_value(serde_json::json!({
+            "id": "cmpl_2",
+            "model": "model",
+            "choices": []
+        }))
+        .unwrap();
+        assert!(matches!(
+            empty.first_text(),
+            Err(CompletionTextError::MissingChoice)
+        ));
     }
 }
