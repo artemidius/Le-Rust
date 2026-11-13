@@ -24,7 +24,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 cargo package
 ```
 
-CI runs the test suite on current Linux and Windows plus the stable macOS 15 image, and separately checks Rust 1.88. The package job builds Cargo's extracted archive so repository-only files or path assumptions cannot hide a packaging problem.
+CI runs the test suite on Ubuntu 24.04, macOS 15, and current Windows, and separately checks Rust 1.88. The package job builds Cargo's extracted archive so repository-only files or path assumptions cannot hide a packaging problem.
 
 ## Live compatibility
 
