@@ -1,0 +1,48 @@
+[package]
+name = "le-rust"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "An unofficial asynchronous Rust SDK for the Mistral AI API"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/artemidius/Le-Rust"
+documentation = "https://docs.rs/le-rust"
+readme = "README.md"
+keywords = ["mistral", "codestral", "ai", "sdk", "async"]
+categories = ["api-bindings", "asynchronous", "web-programming::http-client"]
+include = ["src/**", "examples/**", "tests/**", "docs/**", "spec/**", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "LICENSE-APACHE", "LICENSE-MIT", "Cargo.toml"]
+
+[features]
+default = ["rustls-tls"]
+rustls-tls = ["reqwest/rustls"]
+tracing = ["dep:tracing"]
+
+[dependencies]
+bytes = "1.10"
+futures-core = "0.3"
+futures-util = "0.3"
+httpdate = "1.0"
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "stream", "charset", "http2"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.48", features = ["time"] }
+tracing = { version = "0.1", optional = true, default-features = false }
+url = "2.5"
+
+[dev-dependencies]
+axum = "0.8"
+futures-util = "0.3"
+tokio = { version = "1.48", features = ["macros", "rt-multi-thread", "net", "time"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
