@@ -24,7 +24,7 @@ jobs:
       MISTRAL_MODEL: ${{ inputs.chat_model }}
       CODESTRAL_MODEL: ${{ inputs.codestral_model }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Require configured secret
