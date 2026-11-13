@@ -762,6 +762,23 @@ pub struct ToolCall {
     pub extra: BTreeMap<String, Value>,
 }
 
+impl ToolCall {
+    /// Construct a native function tool call for assistant-history replay.
+    pub fn function(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        arguments: impl Into<ToolArguments>,
+    ) -> Self {
+        Self {
+            id: Some(id.into()),
+            kind: Some("function".into()),
+            function: FunctionCall::new(name, arguments),
+            index: None,
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct FunctionCall {
@@ -772,6 +789,15 @@ pub struct FunctionCall {
 }
 
 impl FunctionCall {
+    /// Construct a function call for a native tool-call message.
+    pub fn new(name: impl Into<String>, arguments: impl Into<ToolArguments>) -> Self {
+        Self {
+            name: name.into(),
+            arguments: arguments.into(),
+            extra: BTreeMap::new(),
+        }
+    }
+
     pub fn parse_arguments<T: serde::de::DeserializeOwned>(&self) -> serde_json::Result<T> {
         match &self.arguments {
             ToolArguments::Json(value) => serde_json::from_value(value.clone()),
@@ -785,6 +811,24 @@ impl FunctionCall {
 pub enum ToolArguments {
     String(String),
     Json(Value),
+}
+
+impl From<String> for ToolArguments {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for ToolArguments {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_owned())
+    }
+}
+
+impl From<Value> for ToolArguments {
+    fn from(value: Value) -> Self {
+        Self::Json(value)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1060,5 +1104,15 @@ mod tests {
             empty.first_text(),
             Err(CompletionTextError::MissingChoice)
         ));
+    }
+
+    #[test]
+    fn tool_call_constructors_produce_replayable_native_message() {
+        let call = ToolCall::function("call-1", "read_file", "{\"path\":\"src/lib.rs\"}");
+        let value = serde_json::to_value(Message::assistant_tool_calls(vec![call])).unwrap();
+        assert_eq!(value["role"], "assistant");
+        assert_eq!(value["tool_calls"][0]["id"], "call-1");
+        assert_eq!(value["tool_calls"][0]["type"], "function");
+        assert_eq!(value["tool_calls"][0]["function"]["name"], "read_file");
     }
 }

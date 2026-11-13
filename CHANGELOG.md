@@ -4,6 +4,12 @@ All notable changes to Le Rust are documented here.
 
 The project follows Semantic Versioning. During the `0.y` series, a change to `y` may contain breaking public API changes.
 
+## 0.1.1 - 2026-11-13
+
+### Added
+
+- Public constructors for function calls and tool calls so agent runtimes can replay native assistant tool-call messages without manufacturing response values through Serde.
+
 ## 0.1.0 - 2026-11-13
 
 ### Added
