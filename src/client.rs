@@ -99,7 +99,7 @@ impl fmt::Debug for ClientBuilder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ClientBuilder")
             .field("api_key", &self.api_key.as_ref().map(|_| "[REDACTED]"))
-            .field("base_url", &self.base_url)
+            .field("base_url", &debug_base_url(&self.base_url))
             .field("connect_timeout", &self.connect_timeout)
             .field("read_timeout", &self.read_timeout)
             .field("header_timeout", &self.header_timeout)
@@ -108,6 +108,17 @@ impl fmt::Debug for ClientBuilder {
             .field("allow_insecure_loopback", &self.allow_insecure_loopback)
             .finish()
     }
+}
+
+fn debug_base_url(value: &str) -> String {
+    let Ok(mut url) = Url::parse(value) else {
+        return "[INVALID URL]".into();
+    };
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    url.set_query(None);
+    url.set_fragment(None);
+    url.to_string()
 }
 
 impl Default for ClientBuilder {
@@ -559,10 +570,17 @@ mod tests {
 
     #[test]
     fn builder_debug_redacts_authorization() {
-        let builder = Client::builder().api_key("super-secret");
+        let builder = Client::builder().api_key("super-secret").base_url(
+            "https://alice:url-secret@example.com/v1/?token=query-secret#fragment-secret",
+        );
         let output = format!("{builder:?}");
         assert!(!output.contains("super-secret"));
+        assert!(!output.contains("alice"));
+        assert!(!output.contains("url-secret"));
+        assert!(!output.contains("query-secret"));
+        assert!(!output.contains("fragment-secret"));
         assert!(output.contains("[REDACTED]"));
+        assert!(output.contains("https://example.com/v1/"));
     }
 
     #[test]
