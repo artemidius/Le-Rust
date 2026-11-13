@@ -1,0 +1,24 @@
+name: API or feature request
+description: Propose a native Mistral API addition or SDK usability improvement
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the application need and why it belongs in the SDK.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed public contract
+      description: Link the primary Mistral API documentation and describe compatibility behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Explain whether the existing extension mechanism or application code can satisfy the need.

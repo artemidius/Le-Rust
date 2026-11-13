@@ -1,0 +1,38 @@
+schema_version = 1
+
+[[operation]]
+method = "GET"
+path = "/v1/models"
+public_method = "Client::models().list"
+
+[[operation]]
+method = "GET"
+path = "/v1/models/{model_id}"
+public_method = "Client::models().retrieve"
+
+[[operation]]
+method = "POST"
+path = "/v1/chat/completions"
+public_method = "Client::chat().complete"
+
+[[operation]]
+method = "POST"
+path = "/v1/chat/completions"
+public_method = "Client::chat().stream"
+
+[[operation]]
+method = "POST"
+path = "/v1/fim/completions"
+public_method = "Client::fim().complete"
+
+[[operation]]
+method = "POST"
+path = "/v1/fim/completions"
+public_method = "Client::fim().stream"
+
+[boundaries]
+tool_execution = false
+model_routing = false
+conversation_storage = false
+automatic_retries = false
+full_platform_coverage = false
