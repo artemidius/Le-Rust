@@ -20,14 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .fim()
         .complete(request, RequestOptions::default())
         .await?;
-    if let Some(text) = response
-        .data
-        .choices
-        .first()
-        .and_then(|choice| choice.message.text())
-    {
-        println!("complete: {text}");
-    }
+    println!("complete: {}", response.data.first_text()?);
 
     let mut stream = client
         .fim()

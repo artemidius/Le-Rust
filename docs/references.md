@@ -27,7 +27,8 @@ The digest and source URL are machine-readable in `spec/source.json` and checked
 
 | Source ambiguity or evolution risk | Le Rust behavior |
 | --- | --- |
-| Model-list examples and schema presentation have differed | Decode the documented list envelope and preserve additional fields; verify through the manual live workflow |
+| Model-list examples and schema presentation have differed | Decode both the documented list envelope and bare-list example shape; preserve additional fields; verify through the manual live workflow |
+| Complete-choice variants may use `message` or `messages` | Preserve the ordinary assistant message and the alternate native multi-message form without merging them |
 | FIM documentation historically showed a default model | Require an explicit caller-selected model |
 | Complete tool calls and streamed tool-call fragments share related schemas | Keep complete and delta Rust types separate; collect fragments by explicit indices |
 | Tool arguments may be a string or JSON object | Preserve both and parse only through an explicit fallible helper |
@@ -36,6 +37,8 @@ The digest and source URL are machine-readable in `spec/source.json` and checked
 | Error bodies may be JSON, validation arrays, text, or HTML | Preserve status/metadata and a bounded raw body without exposing it in default formatting |
 
 OpenAPI and official SDK source are compatibility evidence, not a substitute for authenticated tests against account-available models. Synthetic stream fragmentation tests are intentionally more adversarial than ordinary service output.
+
+See [Design context](design-comparison.md) for the dated, workflow-level comparison with the current generated community Rust SDK.
 
 ## Runtime references
 

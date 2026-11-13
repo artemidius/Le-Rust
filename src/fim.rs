@@ -130,13 +130,63 @@ impl FimRequest {
         if self.model.trim().is_empty() {
             return Err(crate::Error::InvalidRequest("model cannot be empty".into()));
         }
-        for (name, value) in [("temperature", self.temperature), ("top_p", self.top_p)] {
-            if value.is_some_and(|value| !value.is_finite()) {
-                return Err(crate::Error::InvalidRequest(format!(
-                    "{name} must be finite"
-                )));
-            }
+        if self
+            .temperature
+            .is_some_and(|value| !value.is_finite() || !(0.0..=1.5).contains(&value))
+        {
+            return Err(crate::Error::InvalidRequest(
+                "temperature must be between 0 and 1.5, inclusive".into(),
+            ));
+        }
+        if self
+            .top_p
+            .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 1.0)
+        {
+            return Err(crate::Error::InvalidRequest(
+                "top_p must be greater than 0 and no greater than 1".into(),
+            ));
+        }
+        if self.random_seed.is_some_and(|value| value < 0) {
+            return Err(crate::Error::InvalidRequest(
+                "random_seed must be zero or greater".into(),
+            ));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_prompt_is_preserved_and_numeric_ranges_are_validated() {
+        assert!(FimRequest::new("codestral", "").validate().is_ok());
+        assert!(
+            FimRequest::new("codestral", "prefix")
+                .temperature(1.5)
+                .top_p(1.0)
+                .random_seed(0)
+                .validate()
+                .is_ok()
+        );
+        assert!(
+            FimRequest::new("codestral", "prefix")
+                .temperature(-0.1)
+                .validate()
+                .is_err()
+        );
+        assert!(
+            FimRequest::new("codestral", "prefix")
+                .top_p(0.0)
+                .validate()
+                .is_err()
+        );
+        assert!(
+            FimRequest::new("codestral", "prefix")
+                .random_seed(-1)
+                .validate()
+                .is_err()
+        );
     }
 }

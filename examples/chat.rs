@@ -25,7 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .data
         .choices
         .first()
-        .and_then(|choice| choice.message.text())
+        .and_then(|choice| choice.message())
+        .and_then(|message| message.text())
     {
         println!("{text}");
     }

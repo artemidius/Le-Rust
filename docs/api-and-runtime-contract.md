@@ -25,6 +25,10 @@ Function tools carry the native JSON parameter schema. Tool arguments preserve b
 
 `ResponseFormat` supports text, JSON object, and native JSON Schema modes. Successful deserialization proves only that output matches the requested Rust shape; applications still own business validation. Predicted content is forwarded explicitly and is never selected automatically.
 
+`AssistantResponseMessage::parse_json<T>()` is the explicit structured-output parser. `ChatCompletionResponse::first_text()` is a fallible convenience shared by chat and FIM: it distinguishes no choice, an alternate multi-message choice, and non-text content instead of turning any of them into an empty string. Ordinary completion choices expose `message`; alternate native responses using `messages` remain available separately.
+
+Numeric request fields are checked against the documented ranges before transport, including sampling values, penalties, choice counts, seeds, and log-probability limits. Validation is structural only; it does not infer whether a particular account/model supports an optional feature.
+
 ## Transport guarantees
 
 - The default base URL is `https://api.mistral.ai/v1/`.
