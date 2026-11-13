@@ -1,7 +1,5 @@
 #![allow(clippy::print_stdout)]
 
-use std::io;
-
 use le_rust::chat::{ChatRequest, JsonSchemaDefinition, Message, ResponseFormat};
 use le_rust::{Client, RequestOptions};
 use serde::Deserialize;
@@ -46,13 +44,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             RequestOptions::default(),
         )
         .await?;
-    let text = response
+    let language: Language = response
         .data
         .choices
         .first()
-        .and_then(|choice| choice.message.text())
-        .ok_or_else(|| io::Error::other("response did not contain text JSON"))?;
-    let language: Language = serde_json::from_str(text)?;
+        .and_then(|choice| choice.message())
+        .ok_or_else(|| io::Error::other("response did not contain an assistant message"))?
+        .parse_json()?;
     println!("{} {}", language.name, language.year);
     Ok(())
 }
+use std::io;

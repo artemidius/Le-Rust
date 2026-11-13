@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::{ApiResponse, Client, RequestOptions, Result};
@@ -18,16 +18,51 @@ pub struct ListModelsOptions {
     pub request: RequestOptions,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 /// Envelope returned by the model-list endpoint.
 pub struct ModelList {
-    #[serde(default)]
     pub object: Option<String>,
-    #[serde(default)]
     pub data: Vec<ModelCard>,
-    #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl<'de> Deserialize<'de> for ModelList {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum WireModelList {
+            Envelope {
+                #[serde(default)]
+                object: Option<String>,
+                #[serde(default)]
+                data: Vec<ModelCard>,
+                #[serde(flatten)]
+                extra: BTreeMap<String, Value>,
+            },
+            Bare(Vec<ModelCard>),
+        }
+
+        Ok(match WireModelList::deserialize(deserializer)? {
+            WireModelList::Envelope {
+                object,
+                data,
+                extra,
+            } => Self {
+                object,
+                data,
+                extra,
+            },
+            WireModelList::Bare(data) => Self {
+                object: None,
+                data,
+                extra: BTreeMap::new(),
+            },
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,5 +140,34 @@ impl Models<'_> {
         }
         let path = self.client.path_with_segment("models", model_id)?;
         self.client.get_json_url(path, &[], options).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn model_list_accepts_documented_envelope() {
+        let list: ModelList = serde_json::from_value(serde_json::json!({
+            "object": "list",
+            "data": [{"id":"mistral-test"}],
+            "future": true
+        }))
+        .unwrap();
+        assert_eq!(list.object.as_deref(), Some("list"));
+        assert_eq!(list.data[0].id, "mistral-test");
+        assert_eq!(list.extra["future"], true);
+    }
+
+    #[test]
+    fn model_list_accepts_bare_array_shown_by_api_example() {
+        let list: ModelList = serde_json::from_value(serde_json::json!([
+            {"id":"mistral-test", "future": 7}
+        ]))
+        .unwrap();
+        assert!(list.object.is_none());
+        assert_eq!(list.data[0].id, "mistral-test");
+        assert_eq!(list.data[0].extra["future"], 7);
     }
 }

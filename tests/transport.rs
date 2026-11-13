@@ -192,7 +192,12 @@ async fn supported_methods_round_trip_through_public_api() {
         )
         .await
         .unwrap();
-    assert_eq!(chat.data.choices[0].message.text(), Some("hello"));
+    assert_eq!(
+        chat.data.choices[0]
+            .message()
+            .and_then(|message| message.text()),
+        Some("hello")
+    );
     assert_eq!(
         chat.data.choices[0]
             .finish_reason
@@ -213,7 +218,7 @@ async fn supported_methods_round_trip_through_public_api() {
         .collect_response()
         .await
         .unwrap();
-    let arguments: Value = streamed.choices[0].message.tool_calls[0]
+    let arguments: Value = streamed.choices[0].message().unwrap().tool_calls[0]
         .function
         .parse_arguments()
         .unwrap();
@@ -228,7 +233,12 @@ async fn supported_methods_round_trip_through_public_api() {
         )
         .await
         .unwrap();
-    assert_eq!(fim.data.choices[0].message.text(), Some("middle"));
+    assert_eq!(
+        fim.data.choices[0]
+            .message()
+            .and_then(|message| message.text()),
+        Some("middle")
+    );
 
     let fim_stream = client
         .fim()
@@ -241,7 +251,12 @@ async fn supported_methods_round_trip_through_public_api() {
         .collect_response()
         .await
         .unwrap();
-    assert_eq!(fim_stream.choices[0].message.text(), Some("middle"));
+    assert_eq!(
+        fim_stream.choices[0]
+            .message()
+            .and_then(|message| message.text()),
+        Some("middle")
+    );
 
     let requests = state.requests.lock().await;
     assert_eq!(requests.len(), 6);
@@ -259,6 +274,30 @@ async fn supported_methods_round_trip_through_public_api() {
     assert!(requests[2].body["stream"] == false);
     assert!(requests[3].body["stream"] == true);
     assert!(requests[4].body["suffix"] == "after");
+}
+
+#[tokio::test]
+async fn cloned_client_supports_concurrent_requests() {
+    let (base_url, state) = spawn_api().await;
+    let client = test_client(base_url);
+    let requests = (0..24).map(|_| {
+        let client = client.clone();
+        async move {
+            client
+                .models()
+                .list(ListModelsOptions::default())
+                .await
+                .unwrap()
+                .data
+                .data[0]
+                .id
+                .clone()
+        }
+    });
+
+    let models = futures_util::future::join_all(requests).await;
+    assert!(models.iter().all(|model| model == "mistral-test"));
+    assert_eq!(state.requests.lock().await.len(), 24);
 }
 
 #[tokio::test]
@@ -513,6 +552,64 @@ async fn response_header_deadline_is_classified() {
             stage: TimeoutStage::ResponseHeaders
         }
     ));
+}
+
+#[tokio::test]
+async fn response_body_deadline_is_classified() {
+    async fn headers_then_stall() -> Response<Body> {
+        let prefix = stream::once(async {
+            Ok::<Bytes, Infallible>(Bytes::from_static(b"{\"object\":\"list\","))
+        });
+        let never = stream::pending::<Result<Bytes, Infallible>>();
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from_stream(prefix.chain(never)))
+            .unwrap()
+    }
+    let app = Router::new().fallback(headers_then_stall);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let client = Client::builder()
+        .api_key("test-secret")
+        .base_url(format!("http://{address}/v1/"))
+        .allow_insecure_loopback(true)
+        .operation_timeout(Duration::from_millis(20))
+        .build()
+        .unwrap();
+
+    let error = client
+        .models()
+        .list(ListModelsOptions::default())
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        le_rust::Error::Timeout {
+            stage: TimeoutStage::ResponseBody
+        }
+    ));
+}
+
+#[tokio::test]
+async fn per_request_options_may_only_narrow_client_defaults() {
+    let (base_url, state) = spawn_api().await;
+    let client = test_client(base_url);
+
+    for request in [
+        RequestOptions::default().operation_timeout(Duration::ZERO),
+        RequestOptions::default().header_timeout(Duration::from_secs(61)),
+        RequestOptions::default().response_body_bytes(16 * 1024 * 1024 + 1),
+    ] {
+        let error = client
+            .models()
+            .retrieve("mistral-test", request)
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidRequest);
+    }
+    assert!(state.requests.lock().await.is_empty());
 }
 
 #[derive(Clone)]

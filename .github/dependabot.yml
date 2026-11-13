@@ -9,3 +9,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # This ref intentionally selects the compiler used for the MSRV job.
+      - dependency-name: dtolnay/rust-toolchain
+  - package-ecosystem: pip
+    directory: /scripts
+    schedule:
+      interval: weekly
