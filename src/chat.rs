@@ -767,12 +767,12 @@ pub enum CompletionTextError {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ToolCall {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    #[serde(default, rename = "type")]
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
     pub function: FunctionCall,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index: Option<usize>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -1130,6 +1130,20 @@ mod tests {
         assert_eq!(value["tool_calls"][0]["id"], "call-1");
         assert_eq!(value["tool_calls"][0]["type"], "function");
         assert_eq!(value["tool_calls"][0]["function"]["name"], "read_file");
+        assert!(value["tool_calls"][0].get("index").is_none());
+    }
+
+    #[test]
+    fn absent_optional_tool_call_fields_are_omitted_instead_of_null() {
+        let call: ToolCall = serde_json::from_value(serde_json::json!({
+            "function": {"name": "read_file", "arguments": "{}"}
+        }))
+        .unwrap();
+
+        let value = serde_json::to_value(call).unwrap();
+        assert!(value.get("id").is_none());
+        assert!(value.get("type").is_none());
+        assert!(value.get("index").is_none());
     }
 
     #[test]

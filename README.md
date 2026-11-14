@@ -26,7 +26,7 @@ Model identifiers are caller-supplied strings. Le Rust never selects a model, ex
 
 ```toml
 [dependencies]
-le-rust = { git = "https://github.com/artemidius/Le-Rust", tag = "v0.1.2" }
+le-rust = { git = "https://github.com/artemidius/Le-Rust", tag = "v0.1.3" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
