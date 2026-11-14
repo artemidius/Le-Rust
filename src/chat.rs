@@ -435,6 +435,22 @@ impl Message {
             name: None,
         }
     }
+
+    /// Construct a tool-result message that retains the called function's name.
+    ///
+    /// Mistral's documented function-calling loop includes both `name` and
+    /// `tool_call_id` when returning a function result to the model.
+    pub fn named_tool(
+        tool_call_id: impl Into<String>,
+        name: impl Into<String>,
+        content: impl Into<Content>,
+    ) -> Self {
+        Self::Tool {
+            content: content.into(),
+            tool_call_id: tool_call_id.into(),
+            name: Some(name.into()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1114,5 +1130,16 @@ mod tests {
         assert_eq!(value["tool_calls"][0]["id"], "call-1");
         assert_eq!(value["tool_calls"][0]["type"], "function");
         assert_eq!(value["tool_calls"][0]["function"]["name"], "read_file");
+    }
+
+    #[test]
+    fn named_tool_constructor_preserves_function_identity() {
+        let value =
+            serde_json::to_value(Message::named_tool("call-1", "read_file", "file contents"))
+                .unwrap();
+        assert_eq!(value["role"], "tool");
+        assert_eq!(value["tool_call_id"], "call-1");
+        assert_eq!(value["name"], "read_file");
+        assert_eq!(value["content"], "file contents");
     }
 }

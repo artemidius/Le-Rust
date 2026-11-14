@@ -4,6 +4,13 @@ All notable changes to Le Rust are documented here.
 
 The project follows Semantic Versioning. During the `0.y` series, a change to `y` may contain breaking public API changes.
 
+## 0.1.2 - 2026-11-14
+
+### Added
+
+- Added `Message::named_tool` for replaying Mistral tool results with both the
+  original function name and tool-call ID.
+
 ## 0.1.1 - 2026-11-13
 
 ### Added
